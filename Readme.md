@@ -2,7 +2,7 @@
 
 ## Overview
 
-Neurosdk is a powerful tool for working with neuro-sensors BrainBit, BrainBitBlack, Callibri and Kolibri. All these devices work with BLE 4.0+ technology. SDK allows you to connect, read the parameters of devices, as well as receive signals of various types from the selected device. 
+Neurosdk is a powerful tool for working with neuro-sensors BrainBit, BrainBit2, BrainBitBlack, DragonEEG, Callibri and Kolibri. All these devices work with BLE 4.0+ technology. SDK allows you to connect, read the parameters of devices, as well as receive signals of various types from the selected device. 
 
 ## Getting Started
 
@@ -1573,4 +1573,264 @@ sensor.motionAssistantParamCallibri = CallibriMotionAssistantParams(
 sensor.ExecCommand(SensorCommand.EnableMotionAssistant)
 ...
 sensor.ExecCommand(SensorCommand.DisableMotionAssistant)
+```
+
+## NeuroEEG (DragonEEG)
+
+DragonEEG requires pairing with a PC/mobile device. So, before connecting to device, you must put it into pairing mode. SDK starts the pairing process automatically.
+
+Allows for long-term monitoring of brain biopotentials through 21 channels, with parallel registration of three polygraphic channels: ECG, EMG and EOG.
+
+DragonEEG device supports the next signal frequencies:
+ - 1000 Hz
+ - 500 Hz
+ - 250 Hz
+
+And gain values:
+ - 1
+ - 2
+ - 4
+ - 6
+ - 8
+ - 12
+ - 24
+
+### Info about channels
+
+NeuroEEG device has 24 channels. You can get channels count by `channelsCount` property. Get channels count:
+
+###### Java
+```java
+int chCount = sensor.getChannelsCount();
+```
+
+###### Kotlin
+```kotlin
+val chCount: Int = sensor.channelsCount
+```
+
+Receive supportes channels info:
+
+###### Java
+```java
+List<EEGChannelInfo> channels = sensor.getSupportedChannels();
+```
+
+###### Kotlin
+```kotlin
+var channels: List<EEGChannelInfo> = sens.supportedChannels
+```
+
+`EEGChannelInfo` contains some info:
+ - Id - `EEGChannelId` type - physical location of the channel. Possible values:
+  - O1 
+  - P3 
+  - C3 
+  - F3 
+  - Fp1
+  - T5 
+  - T3 
+  - F7 
+  - F8 
+  - T4 
+  - T6 
+  - Fp2
+  - F4 
+  - C4 
+  - P4 
+  - O2 
+  - D1 
+  - D2 
+  - OZ 
+  - PZ 
+  - CZ 
+  - FZ 
+  - FpZ
+  - D3 
+ - ChType - `EEGChannelType` type - type of channel, possible values A1, A2, differential or referent
+ - Name - `string` type - channel name
+ - Num - `int` type - channel number. By this number the channel will be located in the array of signal or resistance values
+
+### AmpMode
+
+This device can show it's current amplifier mode. It can be in the following states:
+
+  - Invalid
+  - PowerDown
+  - Idle
+  - Signal
+  - Resist
+  - SignalResist
+
+You can check amp. mode by two ways:
+
+1. by callback:
+
+###### Java
+```java
+sensor.sensorAmpModeChanged = mode -> {
+    // check AmpMode
+};
+...
+sensor.sensorAmpModeChanged = null;
+```
+
+###### Kotlin
+```kotlin
+sensor.sensorAmpModeChanged = SensorAmpModeChanged {mode -> 
+    // check AmpMode    
+}
+...
+sensor.sensorAmpModeChanged = null
+```
+
+2. get value at any time:
+
+###### Java
+```java
+SensorAmpMode mode = sensor.getAmpMode();
+```
+
+###### Kotlin
+```kotlin
+var mode: SensorAmpMode = sensor.ampMode
+```
+
+It is very important parameter for NeuroEEG-M device because you can set amplifier parameters only if device into `PowerDown` or `Idle` mode.
+
+### Amplifier params
+
+After connecting the device, it is absolutely necessary to configure the parameters of the amplifier. If this is not done, the signal and resistance values will be 0.0 or will not appear at all.
+
+###### Java
+```java
+NeuroEEGAmplifierParam ampParam = sensor.getAmplifierParam();
+ampParam.setFrequency(SensorSamplingFrequency.FrequencyHz500);
+ampParam.setReferentResistMesureAllow(true);
+for (int i = 0; i < sensor.getChannelsCount(); ++i) {
+    ampParam.ChannelMode[i] = EEGChannelMode.SignalResist;
+    ampParam.ChannelGain[i] = SensorGain.Gain6;
+}
+sensor.setAmplifierParam(ampParam);
+```
+
+###### Kotlin
+```kotlin
+val ampParam: NeuroEEGAmplifierParam = sensor.amplifierParam
+ampParam.frequency = SensorSamplingFrequency.FrequencyHz500
+ampParam.referentResistMesureAllow = true
+for (i in 0 until sensor!!.channelsCount) {
+    ampParam.ChannelMode[i] = EEGChannelMode.SignalResist
+    ampParam.ChannelGain[i] = SensorGain.Gain6
+}
+sensor.amplifierParam = ampParam
+```
+
+Channel modes:
+ - SignalResist - device will be sent signal and resist values simultaneously
+ - Signal - device will be sent only signal values, channel resistance will not be measured even if the resistance measurement mode is started in the device
+ - Shorted - channel is shorted to ground, this mode can be used to analyze intrinsic noise of the device
+ - Test - this channel will receive a test signal
+ - Off - channel is disabled, no data from it
+
+Referent modes:
+ - A1A2 - both A1 and A2 references are available
+ - HeadTop - only one reference is available, the resistance data is placed in field A1
+
+ReferentResistMesureAllow - flag, allows resistance measurement by references (if true, the signal is not valid)
+
+### Receiving signal
+
+To receive signal data, you need to subscribe to the corresponding callback. The values come in volts. In order for the device to start transmitting data, you need to start a signal using the `execute` command. This method is also recommended to be run in an separate thread.
+
+The sampling rate can be controlled using the `Frequency` value of amplifier parameters. For example, at a frequency of 1000 Hz, the device will send about 1000 samples per second. Supports frequencies 250/500/1000 Hz. You can also adjust signal power (`Gain`) value for each channel.
+
+###### Java
+```java
+sensor.signalDataReceived = data -> {
+    Log.i("TAG", Arrays.toString(data));
+};
+sensor.ExecCommand(SensorCommand.StartSignal);
+...
+sensor.signalDataReceived = null
+sensor.ExecCommand(SensorCommand.StopSignal);
+```
+
+###### Kotlin
+```kotlin
+sensor.signalDataReceived = Sensor.NeuroEEGSignalDataReceived { data ->
+    Log.i("TAG", data.toString())
+}
+sensor.ExecCommand(SensorCommand.StartSignal)
+...
+sensor.signalDataReceived = null
+sensor.ExecCommand(SensorCommand.StopSignal)
+```
+
+You get signal values as a list of samples, each containing:
+ - PackNum - number for each packet
+ - Marker - marker of sample
+ - Samples - array of samples in V. Each sample number into array consistent with `Num` value of `EEGChannelInfo` from `supported_channels` property.
+
+### Receiving resistance
+
+NeuroEEG also allow you to get resistance values. With their help, you can determine the quality of the electrodes to the skin. Initial resistance values are infinity. The values change when the device is on the head.
+
+###### Java
+```java
+sensor.resistDataReceived = data -> {
+    Log.i("TAG", Arrays.toString(data));
+};
+sensor.ExecCommand(SensorCommand.StartResist);
+...
+sensor.resistDataReceived = null
+sensor.ExecCommand(SensorCommand.StopResist);
+```
+
+###### Kotlin
+```kotlin
+sensor.resistDataReceived = Sensor.NeuroEEGResistDataReceived { data ->
+    Log.i("TAG", data.toString())
+}
+sensor.ExecCommand(SensorCommand.StartResist)
+...
+sensor.resistDataReceived = null
+sensor.ExecCommand(SensorCommand.StopResist)
+```
+
+You get resistance values structure of samples for each channel:
+ - PackNum - number for each packet
+ - A1 - value of A1 channel in Ohm
+ - A2 - value of A2 channel in Ohm
+ - Bias - value of Bias channel in Ohm
+ - Values - array of values in Ohm. Each sample number into array consistent with `Num` value of `EEGChannelInfo` from `getSupportedChannels()` method.
+
+### Receiving signal and resistance
+
+This device supports capturing signal and resistance at the same time. 
+
+> NOTE:
+> In this mode resistData may not arrive every update of the SignalResistReceived callback.
+
+###### Java
+```java
+sensor.signalResistReceived = signalData, resistData -> {
+    Log.i("TAG", Arrays.toString(signalData));
+    Log.i("TAG", Arrays.toString(resistData));
+};
+sensor.ExecCommand(SensorCommand.StartSignalAndResist);
+...
+sensor.signalResistReceived = null
+sensor.ExecCommand(SensorCommand.StopSignalAndResist);
+```
+
+###### Kotlin
+```kotlin
+sensor.signalResistReceived = Sensor.NeuroEEGSignalResistReceived { signalData, resistData ->
+    Log.i("TAG", data.toString())
+}
+sensor.ExecCommand(SensorCommand.StartSignalAndResist)
+...
+sensor.signalResistReceived = null
+sensor.ExecCommand(SensorCommand.StopSignalAndResist)
 ```
