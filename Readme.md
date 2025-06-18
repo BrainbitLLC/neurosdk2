@@ -2,7 +2,7 @@
 
 ## Overview
 
-Neurosdk is a powerful tool for working with neuro-sensors BrainBit, BrainBit2, BrainBitBlack, DragonEEG, Callibri and Kolibri. All these devices work with BLE 4.0+ technology. SDK allows you to connect, read the parameters of devices, as well as receive signals of various types from the selected device. 
+Neurosdk is a powerful tool for working with neuro-sensors BrainBit, BrainBit2, BrainBitBlack, DragonEEG, Callibri and Kolibri, Headband and Headphones. All these devices work with BLE 4.0+ technology. SDK allows you to connect, read the parameters of devices, as well as receive signals of various types from the selected device. 
 
 ## Getting Started
 
